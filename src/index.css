@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.outlet-root {
+  min-height: 650px;
+  padding-bottom: 2rem;
+}

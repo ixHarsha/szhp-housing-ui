@@ -1,0 +1,67 @@
+import { szhpApiClient } from './szhpApiClient';
+import type {
+  IHousingApplicationDetails,
+  IHousingApplicationSummary,
+  ILookupItem,
+  IPagedResponse,
+  IRequestHistory,
+} from 'src/types/housing';
+
+export interface IApplicationListQuery {
+  status?: string;
+  search?: string;
+  pageNo?: number;
+  pageSize?: number;
+}
+
+export const szhpService = {
+  getHousingApplications: async (query: IApplicationListQuery) => {
+    const { data } = await szhpApiClient.get<IPagedResponse<IHousingApplicationSummary>>(
+      '/housing-applications',
+      { params: query },
+    );
+    return data;
+  },
+
+  getHousingApplicationById: async (applicationId: string) => {
+    const { data } = await szhpApiClient.get<IHousingApplicationDetails>(
+      `/housing-applications/${encodeURIComponent(applicationId)}`,
+    );
+    return data;
+  },
+
+  createHousingApplication: async (payload: IHousingApplicationDetails) => {
+    const { data } = await szhpApiClient.post<IHousingApplicationDetails>(
+      '/housing-applications',
+      payload,
+    );
+    return data;
+  },
+
+  updateHousingApplication: async (applicationId: string, payload: IHousingApplicationDetails) => {
+    const { data } = await szhpApiClient.put<IHousingApplicationDetails>(
+      `/housing-applications/${encodeURIComponent(applicationId)}`,
+      payload,
+    );
+    return data;
+  },
+
+  submitHousingApplication: async (applicationId: string) => {
+    const { data } = await szhpApiClient.post<IHousingApplicationDetails>(
+      `/housing-applications/${encodeURIComponent(applicationId)}/submit`,
+    );
+    return data;
+  },
+
+  getRequestHistory: async (applicationId: string) => {
+    const { data } = await szhpApiClient.get<IRequestHistory[]>(
+      `/housing-applications/${encodeURIComponent(applicationId)}/history`,
+    );
+    return data;
+  },
+
+  getLookup: async (domain: string) => {
+    const { data } = await szhpApiClient.get<ILookupItem[]>(`/lookups/${domain}`);
+    return data;
+  },
+};
