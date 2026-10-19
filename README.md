@@ -73,6 +73,14 @@ Form sections follow `pages/external-form`: **Social Status**, **Housing
 Data**, **Assistance Request Details**, **Residential Details**. Field names
 follow `external-form/schema/HousingFormSchema.ts`.
 
+**Required Documents** (`components/AttachmentsSection.tsx`) adds one aegov
+file input (`aegov-file-input-control`) per document type in
+`ATTACHMENT_TYPES`. Chosen files are held in the form and uploaded when it is
+saved; Emirates ID and Family Book are required to submit, checked here and
+again by the API. The view page lists the documents with download links.
+`postcss.config.js` ignores `^\.file-input-` for the same reason as the other
+design-system patterns.
+
 ## Contract
 
 `src/types/housing.ts` mirrors `IHousingApplicationDetails`, `IApplicantDetails`,

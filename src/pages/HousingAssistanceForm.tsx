@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { FormEvent, useEffect, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,8 +10,11 @@ import Button from 'src/components/ui/Button';
 import Loader from 'src/components/ui/Loader';
 import FormFieldGenerator, { FieldData } from 'src/components/FormFieldGenerator';
 import SectionHeader from 'src/components/SectionHeader';
+import AttachmentsSection, { PendingAttachment } from 'src/components/AttachmentsSection';
 import { szhpService } from 'src/services/szhpService';
+import { apiErrorMessage } from 'src/services/szhpApiClient';
 import {
+  ATTACHMENT_TYPES,
   ASSISTANCE_PURPOSE_OPTIONS,
   ASSISTANCE_TYPE_OPTIONS,
   EMIRATE_OPTIONS,
@@ -21,7 +24,7 @@ import {
   REQUEST_TYPE_SZHP,
   TECHNICAL_CONDITION_OPTIONS,
 } from 'src/constants/housing';
-import type { IHousingApplicationDetails } from 'src/types/housing';
+import type { IAttachment, IHousingApplicationDetails } from 'src/types/housing';
 
 /**
  * Field names follow external-form/schema/HousingFormSchema.ts so the payload
@@ -156,10 +159,21 @@ const HousingAssistanceForm = () => {
   const { applicationId } = useParams();
   const editing = Boolean(applicationId);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A failed first save lands here on the edit route with its message.
+  const [error, setError] = useState<string | null>(
+    (location.state as { error?: string } | null)?.error ?? null,
+  );
+
+  /* Documents: what the server holds, what is chosen but not yet uploaded,
+     and what the applicant removed. Nothing is sent until the form is saved. */
+  const [existing, setExisting] = useState<IAttachment[]>([]);
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [showDocErrors, setShowDocErrors] = useState(false);
 
   const useFormMethods = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -175,6 +189,8 @@ const HousingAssistanceForm = () => {
       .getHousingApplicationById(applicationId)
       .then((d) => {
         if (!active) return;
+        setExisting(d.attachments ?? []);
+        setRemovedIds([]);
         useFormMethods.reset({
           ...DEFAULTS,
           maritalStatus: d.maritalStatus ?? '',
@@ -223,26 +239,70 @@ const HousingAssistanceForm = () => {
     };
   }, [applicationId, useFormMethods]);
 
+  const visibleExisting = existing.filter((a) => !a.id || !removedIds.includes(a.id));
+  const missingDocuments = ATTACHMENT_TYPES.filter(
+    (type) =>
+      type.required &&
+      !visibleExisting.some((a) => a.attachmentTypeId === type.value) &&
+      !pending.some((p) => p.attachmentTypeId === type.value),
+  );
+
+  /**
+   * Saves the form, then applies document removals and uploads, then submits.
+   * Each document step updates state as it lands, so a retry after a failure
+   * never uploads the same file twice.
+   */
   const save = async (submit: boolean) => {
     setSaving(true);
     setError(null);
+    let id = applicationId;
     try {
       const payload = toPayload(useFormMethods.getValues());
       const saved = editing
         ? await szhpService.updateHousingApplication(applicationId!, payload)
         : await szhpService.createHousingApplication(payload);
+      id = saved.applicationId ?? applicationId;
+      if (!id) throw new Error('The service did not return an application id.');
 
-      const id = saved.applicationId ?? applicationId;
-      if (submit && id) {
+      for (const attachmentId of removedIds) {
+        await szhpService.deleteAttachment(id, attachmentId);
+        setRemovedIds((prev) => prev.filter((x) => x !== attachmentId));
+        setExisting((prev) => prev.filter((a) => a.id !== attachmentId));
+      }
+      for (const item of pending) {
+        const uploaded = await szhpService.uploadAttachment(id, item.attachmentTypeId, item.file);
+        setPending((prev) => prev.filter((p) => p.key !== item.key));
+        setExisting((prev) => [...prev, uploaded]);
+      }
+
+      if (submit) {
         await szhpService.submitHousingApplication(id);
       }
       navigate(`/housing-requests/${id}`);
-    } catch {
-      setError('The request could not be saved.');
+    } catch (err) {
+      const message = apiErrorMessage(err, 'The request could not be saved.');
+      if (!editing && id) {
+        // The draft exists now - carry on with it rather than creating a second one.
+        navigate(`/housing-requests/${id}/edit`, { replace: true, state: { error: message } });
+      }
+      setError(message);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setSaving(false);
     }
+  };
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    setShowDocErrors(true);
+    return useFormMethods.handleSubmit(() => {
+      if (missingDocuments.length) {
+        document
+          .getElementById(`attachment-${missingDocuments[0].value}-field`)
+          ?.scrollIntoView({ block: 'center' });
+        return;
+      }
+      return save(true);
+    })(event);
   };
 
   const socialStatusFields: FieldData[] = [
@@ -312,7 +372,7 @@ const HousingAssistanceForm = () => {
 
       {error ? <Alert type='error' showIcon message={error} className={hp('mb-4')} /> : null}
 
-      <form onSubmit={useFormMethods.handleSubmit(() => save(true))}>
+      <form onSubmit={onSubmit}>
         <SectionHeader title='Social Status' />
         <div className={hp('grid grid-cols-1 md:grid-cols-3 gap-4 mb-8')}>
           <FormFieldGenerator data={socialStatusFields} useFormMethods={useFormMethods} />
@@ -332,6 +392,22 @@ const HousingAssistanceForm = () => {
         <div className={hp('grid grid-cols-1 md:grid-cols-3 gap-4 mb-8')}>
           <FormFieldGenerator data={residentialFields} useFormMethods={useFormMethods} />
         </div>
+
+        <SectionHeader title='Required Documents' />
+        <AttachmentsSection
+          existing={visibleExisting}
+          pending={pending}
+          disabled={saving}
+          showRequiredErrors={showDocErrors}
+          onAdd={(attachmentTypeId, files) =>
+            setPending((prev) => [
+              ...prev,
+              ...files.map((file, i) => ({ key: `${Date.now()}-${i}-${file.name}`, attachmentTypeId, file })),
+            ])
+          }
+          onRemovePending={(key) => setPending((prev) => prev.filter((p) => p.key !== key))}
+          onRemoveExisting={(attachmentId) => setRemovedIds((prev) => [...prev, attachmentId])}
+        />
 
         <div className={hp('flex flex-wrap gap-3')}>
           <Button type='submit' disabled={saving}>

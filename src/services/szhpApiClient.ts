@@ -23,3 +23,16 @@ export const setApplicantId = (applicantId: string) => {
 
 export const isValidResponse = (status?: number) =>
   typeof status === 'number' && status >= 200 && status < 300;
+
+/** The API's {message} for a failed call, or the fallback when there is none. */
+export const apiErrorMessage = (error: unknown, fallback: string) => {
+  if (axios.isAxiosError(error)) {
+    const message = (error.response?.data as { message?: string } | undefined)?.message;
+    if (message) return message;
+  }
+  return fallback;
+};
+
+/** Absolute URL for an IAttachment.filePath, which is relative to the API base. */
+export const attachmentUrl = (filePath: string) =>
+  `${szhpApiClient.defaults.baseURL ?? ''}${filePath}`;

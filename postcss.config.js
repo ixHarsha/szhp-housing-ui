@@ -25,6 +25,7 @@ export default {
         /^\.control-/,
         /^\.form-control/,
         /^\.error-message$/,
+        /^\.file-input-/,
         /^\.input-/,
         /^\.with-seperator$/,
       ],

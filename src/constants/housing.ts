@@ -187,3 +187,23 @@ export const CANCEL_REASON_OPTIONS = [
   { label: 'Requested by Applicant', value: 'REQUESTED_BY_APPLICANT' },
   { label: 'Other', value: 'OTHER' },
 ];
+
+/* ----------------------------------------------------------- attachments */
+
+/**
+ * Documents the applicant can upload, kept in step with AttachmentType in the
+ * API. The API enforces `required` on submit; the form checks it first so the
+ * applicant sees which document is missing before anything is sent.
+ */
+export const ATTACHMENT_TYPES = [
+  { label: 'Emirates ID', value: 'EMIRATES_ID', required: true },
+  { label: 'Family Book', value: 'FAMILY_BOOK', required: true },
+  { label: 'Salary Certificate', value: 'SALARY_CERTIFICATE', required: false },
+  { label: 'Lease / Rental Contract', value: 'LEASE_CONTRACT', required: false },
+  { label: 'Land Ownership / Allocation', value: 'LAND_OWNERSHIP', required: false },
+  { label: 'Other Supporting Documents', value: 'OTHER', required: false },
+];
+
+/** Mirrors AttachmentService.MAX_FILE_SIZE and its allowed extensions. */
+export const ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+export const ATTACHMENT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png'];

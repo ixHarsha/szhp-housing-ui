@@ -8,8 +8,10 @@ import Loader from 'src/components/ui/Loader';
 import Status from 'src/components/ui/Status';
 import JobDetails from 'src/components/JobDetails';
 import SectionHeader from 'src/components/SectionHeader';
+import DocumentList from 'src/components/DocumentList';
 import { szhpService } from 'src/services/szhpService';
-import { APPLICATION_STATUS_LABEL, isEditableStatus } from 'src/constants/housing';
+import { apiErrorMessage, attachmentUrl } from 'src/services/szhpApiClient';
+import { APPLICATION_STATUS_LABEL, ATTACHMENT_TYPES, isEditableStatus } from 'src/constants/housing';
 import type { IHousingApplicationDetails, IRequestHistory } from 'src/types/housing';
 import { asText, formatAED, formatDate, formatDateTime } from 'src/utils/format';
 
@@ -55,8 +57,8 @@ const HousingApplicationDetailsPage = () => {
       setDetails(updated);
       setNotice('The request has been submitted.');
       await load();
-    } catch {
-      setError('The request could not be submitted.');
+    } catch (err) {
+      setError(apiErrorMessage(err, 'The request could not be submitted.'));
     } finally {
       setBusy(false);
     }
@@ -202,6 +204,33 @@ const HousingApplicationDetailsPage = () => {
             { title: 'Previously Received Aid', value: asText(details.receviedHousingAID) },
           ]}
         />
+      </div>
+
+      <SectionHeader title='Documents' />
+      <div className={hp('mb-8')}>
+        {ATTACHMENT_TYPES.map((type) => {
+          const files = (details.attachments ?? []).filter((a) => a.attachmentTypeId === type.value);
+          return (
+            <div key={type.value} className={hp('grid grid-cols-1 md:grid-cols-3 gap-2 py-3 border-b border-[#f1f1f1]')}>
+              <div className={hp('text-[#8D8E90]')}>{type.label}</div>
+              <div className={hp('md:col-span-2 space-y-2')}>
+                {files.length ? (
+                  <DocumentList
+                    items={files.map((a) => ({
+                      key: a.id ?? a.filePath,
+                      fileName: a.fileName ?? 'document',
+                      fileSize: a.fileSize,
+                      fileType: a.fileType,
+                      href: attachmentUrl(a.filePath),
+                    }))}
+                  />
+                ) : (
+                  <span className={hp('text-[#323438]')}>{type.required ? 'Not provided' : '-'}</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <SectionHeader title='Request History' />

@@ -1,5 +1,6 @@
 import { szhpApiClient } from './szhpApiClient';
 import type {
+  IAttachment,
   IHousingApplicationDetails,
   IHousingApplicationSummary,
   ILookupItem,
@@ -58,6 +59,32 @@ export const szhpService = {
       `/housing-applications/${encodeURIComponent(applicationId)}/history`,
     );
     return data;
+  },
+
+  getAttachments: async (applicationId: string) => {
+    const { data } = await szhpApiClient.get<IAttachment[]>(
+      `/housing-applications/${encodeURIComponent(applicationId)}/attachments`,
+    );
+    return data;
+  },
+
+  uploadAttachment: async (applicationId: string, attachmentTypeId: string, file: File) => {
+    const body = new FormData();
+    body.append('attachmentTypeId', attachmentTypeId);
+    body.append('file', file);
+    const { data } = await szhpApiClient.post<IAttachment>(
+      `/housing-applications/${encodeURIComponent(applicationId)}/attachments`,
+      body,
+      // The client defaults to JSON, which would make axios serialise the FormData.
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return data;
+  },
+
+  deleteAttachment: async (applicationId: string, attachmentId: string) => {
+    await szhpApiClient.delete(
+      `/housing-applications/${encodeURIComponent(applicationId)}/attachments/${encodeURIComponent(attachmentId)}`,
+    );
   },
 
   getLookup: async (domain: string) => {
